@@ -59,10 +59,10 @@ QUERY_TRANSLATOR_FACTORY = create_translator
 """
 TODO:
 
-- decide where to store the CQP/Tree config (hardcoded right now)
-- this still relies on manually installing CQP/Tree `uv pip install path/to/local/cqp-tree/`. Make it pip-installable with option for minimal dependencies?
-- `cqp_tree.known_translators.keys()` makes it so that we can translate all languages supported by CQP/Tree, *including CoNLL-U*. Is that what we want?
-- checke whether conversion takes longer than 50ms, move to a different thread if not
-- lang useless right now because tree_translate guesses it, should we make it optional (here or in tree_translate)?
-- exception handling is basic right now because apparently "catching classes that do not inherit from BaseException (like InputError, ParsingFailed, NotSupported, UnableToGuessTranslatorError) is not allowed""
+- [ ] decide where to store the CQP/Tree config (hardcoded right now)
+- [ ] this still relies on manually installing CQP/Tree `uv pip install path/to/local/cqp-tree/`. Make it pip-installable with option for minimal dependencies?
+- [ ] `cqp_tree.known_translators.keys()` makes it so that we can translate all languages supported by CQP/Tree, *including CoNLL-U*. Is that what we want?
+- [x] check whether conversion takes longer than 50ms, move to a different thread if not (Niklas says <20ms, give Martin the context for that)
+- [ ] lang useless right now because tree_translate guesses it, should we make it optional (here or in tree_translate)?
+- [ ] exception handling is basic right now because apparently "catching classes that do not inherit from BaseException (like InputError, ParsingFailed, NotSupported, UnableToGuessTranslatorError) is not allowed""
 """
