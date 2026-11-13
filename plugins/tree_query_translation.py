@@ -1,56 +1,48 @@
-"""Example translation plugin with two dummy query languages.
+"""Tree query translation plugin based on CQP/Tree (https://github.com/Niklas-Deworetzki/cqp-tree).
 
-Enable with PLUGINS=["plugins.example_query_translation"].
-
-Both `dummy-word` and `dummy-lemma` accept one token of letters, digits, or underscores.
-
-For a real translation library, keep cheap validation inline and offload potentially expensive synchronous parsing,
-compilation, and formatting to a worker thread (anything that takes more than 50 ms). For example:
-
-    return await anyio.to_thread.run_sync(self._translate_sync, language, query)
-
-Here, `_translate_sync` is your synchronous helper returning the finished CQP string.
+Enable with PLUGINS=["plugins.tree_query_translation"].
 """
 
 import re
 from collections.abc import Mapping
 from typing import Any
+from pathlib import Path
+
+from cqp_tree import translate as tree_translate, configuration_from_file, known_translators
+from cqp_tree.translation import InputError, ParsingFailed, NotSupported, UnableToGuessTranslatorError
 
 from korp.dependencies import Ctx
 
-
-class ExampleQueryTranslator:
-    """Example query translator for two dummy query languages.
+class TreeQueryTranslator:
+    """Tree query translator supporting Grew, dep_search, deptreepy and more.
 
     Korp shares this instance across concurrent requests. Keep per-query parser and compilation state local to
     each call, and treat any configuration stored on the instance as read-only during translation.
     """
 
-    languages = frozenset({"dummy-word", "dummy-lemma"})
+    languages =  frozenset(known_translators.keys())
+    cqptree_config = configuration_from_file(Path("/home/harisont/Repos/Niklas-Deworetzki/cqp-tree/configurations/spraakbanken-korp/server.toml"))
 
     async def translate(self, ctx: Ctx, language: str, query: str) -> str:  # ruff: ignore[no-self-use, unused-method-argument]
-        """Translate one simple token query in one of the dummy languages into a CQP expression.
+        """Translate a tree query in one of the languages supported by CQP/Tree into a CQP expression.
 
         Returns:
             One CQP expression.
 
         Raises:
-            ValueError: If the input is not a single supported token.
+            ValueError: If the input cannot be parsed in any of the languages supported by CQP/Tree.
         """
-        # This simple validation and string formatting are cheap enough to run on the event loop.
 
-        # Use ValueError to signal errors with the input.
-        if not re.fullmatch(r"\w+", query):
-            raise ValueError("Dummy queries accept one token containing only letters, digits, and underscores.")
-
-        # language has already been validated against self.languages by the caller, so we can safely use it here.
-        attribute = "word" if language == "dummy-word" else "lemma"
+        try: 
+            translation = tree_translate(str, self.cqptree_config, prohibit_recipes=True)[-1]
+        except Exception as error:
+            raise ValueError("{}".format(error))
 
         # Return one non-empty CQP expression without a trailing semicolon or outer within clause.
-        return f'[{attribute}="{query}"]'
+        return translation
 
 
-def create_translator(config: Mapping[str, Any]) -> ExampleQueryTranslator:  # ruff: ignore[unused-function-argument]
+def create_translator(config: Mapping[str, Any]) -> TreeQueryTranslator:  # ruff: ignore[unused-function-argument]
     """Create a query translator provider for this plugin.
 
     Korp calls this factory at app creation with this plugin's `PLUGINS_CONFIG` entry (or an empty mapping).
@@ -59,7 +51,18 @@ def create_translator(config: Mapping[str, Any]) -> ExampleQueryTranslator:  # r
     Returns:
         The configured provider.
     """
-    return ExampleQueryTranslator()
+    return TreeQueryTranslator()
 
 
 QUERY_TRANSLATOR_FACTORY = create_translator
+
+"""
+TODO:
+
+- decide where to store the CQP/Tree config (hardcoded right now)
+- this still relies on manually installing CQP/Tree `uv pip install path/to/local/cqp-tree/`. Make it pip-installable with option for minimal dependencies?
+- `cqp_tree.known_translators.keys()` makes it so that we can translate all languages supported by CQP/Tree, *including CoNLL-U*. Is that what we want?
+- checke whether conversion takes longer than 50ms, move to a different thread if not
+- lang useless right now because tree_translate guesses it, should we make it optional (here or in tree_translate)?
+- exception handling is basic right now because apparently "catching classes that do not inherit from BaseException (like InputError, ParsingFailed, NotSupported, UnableToGuessTranslatorError) is not allowed""
+"""
